@@ -1,0 +1,49 @@
+This repository contains two implementations of an in-memory cache
+written an exercise in learning Go (golang) and Haskell's STM
+(software transactional memory).  This is also an exercise in learning
+godoc and Haddock.
+
+The cache is implemented as a trie.  A server implementing a subset of
+the memcache protocol is implemented on top of the cache.  A client
+implementing the memcache protocol subset allows the two
+implementations to interoperate.
+
+Other than using explicit locks in Go and STM in Haskell, the two
+implementations are very similar.
+
+In the Go implementation, the trie cache and the remote cache client
+implement a Cache interface.  In the Haskell implementation, the trie
+cache and the remote cache client are instances of a Cache typeclass.
+
+In the Go implementation, the remote cache client is a goroutine that
+receives requests from a channel, talks to the server, and returns 
+the result via a channel included in the request.  In the Haskell
+implementation, the remote cache client is a thread that receives
+requests from a Control.Concurrent.Chan, talks to the server, and
+returns the result via a Control.Concurrent.MVar included in the
+request.
+
+Building the servers:
+
+  * Go: go build server.go
+  * Haskell: ghc --make server
+
+Building test clients:
+
+  * Go: go build test.go
+  * Haskell: ghc --make test
+
+Running the server:
+
+  * ./server [-d] [port-number]
+
+The -d flag turns on debug tracing.  The port-number is the port to
+listen on, and defaults to 22122.
+
+Running the test client:
+
+  * ./test [[-d] hostname port-number]
+
+The -d flag turns on debug tracing.  The hostname and port-number
+is the location of the remote cache.  If omitted, the in-memory trie
+cache is used.
