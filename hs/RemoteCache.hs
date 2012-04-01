@@ -1,4 +1,3 @@
--- | RemoteCache
 module RemoteCache(
     -- * Types
     RemoteCache,
@@ -31,7 +30,7 @@ import Protocol(
     statusNoError, statusKeyNotFound, statusKeyExists,
     statusItemNotStored, statusNotSupported, statusInternalError)
 
--- | RemoteCache
+-- | RemoteCache accesses a remote cache, using a memcache protocol subset.
 data RemoteCache t e = RemoteCache {
     rcSerialize :: e -> (Word32,ByteString),
     rcDeserialize :: (Word32,ByteString) -> e,
@@ -48,7 +47,11 @@ data Req = Req {
     reqResult :: MVar (Maybe Packet)
     }
 
--- | newRemoteCache
+-- | Create a new RemoteCache that connects to the given host and port.
+-- The Logger logs the requests and responses.  serializeValue and
+-- deserializeValue convert the entry values to and from the bytes
+-- used with the remote cache.  convertExpiry converts timestamps to
+-- NominalDiffTime.
 newRemoteCache :: Ord t => Logger -> HostName -> ServiceName -> (e -> (Word32,ByteString)) -> ((Word32,ByteString) -> e) -> (t -> t -> NominalDiffTime) -> IO (RemoteCache t e)
 newRemoteCache logger hostname service serializeValue deserializeValue convertExpiry = do
     (addrInfo:_) <- getAddrInfo Nothing (Just hostname) (Just service)

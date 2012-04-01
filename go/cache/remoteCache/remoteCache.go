@@ -1,4 +1,5 @@
-// remoteCache ...
+// Package remoteCache provides access to a remote cache using
+// subset of the memcache protocol.
 package remoteCache
 
 import (
@@ -18,7 +19,8 @@ type remoteRequest struct {
 	response                   chan *protocol.Packet
 }
 
-// New ...
+// New returns a Cache that connects to addr.
+// logger, if non-nil, logs the traffic to and from the remote cache.
 func New(logger *log.Logger, addr string) (cache.Cache, error) {
 	conn, err := net.Dial("tcp", addr)
 	if err != nil {
@@ -42,7 +44,6 @@ func remoteHandler(logger *log.Logger, c remoteCache, conn net.Conn) {
 	}
 }
 
-// Get ...
 func (c remoteCache) Get(key []byte, time cache.Timestamp) ([]byte, uint32, cache.Version, error) {
 	req := &remoteRequest{
 		cmd:      protocol.CmdGet,
@@ -62,7 +63,6 @@ func (c remoteCache) Get(key []byte, time cache.Timestamp) ([]byte, uint32, cach
 	return nil, 0, 0, cache.UnknownError
 }
 
-// Set ...
 func (c remoteCache) Set(key, data []byte, flags uint32, expires, time cache.Timestamp) (cache.Version, error) {
 	req := &remoteRequest{
 		cmd:      protocol.CmdSet,
@@ -82,7 +82,6 @@ func (c remoteCache) Set(key, data []byte, flags uint32, expires, time cache.Tim
 	return 0, cache.UnknownError
 }
 
-// Add ...
 func (c remoteCache) Add(key, data []byte, flags uint32, expires, time cache.Timestamp) (cache.Version, error) {
 	req := &remoteRequest{
 		cmd:      protocol.CmdAdd,
@@ -104,7 +103,6 @@ func (c remoteCache) Add(key, data []byte, flags uint32, expires, time cache.Tim
 	return 0, cache.UnknownError
 }
 
-// Replace ...
 func (c remoteCache) Replace(key, data []byte, flags uint32, version cache.Version, expires, time cache.Timestamp) (cache.Version, error) {
 	req := &remoteRequest{
 		cmd:      protocol.CmdReplace,
@@ -129,7 +127,6 @@ func (c remoteCache) Replace(key, data []byte, flags uint32, version cache.Versi
 	return 0, cache.UnknownError
 }
 
-// Delete ...
 func (c remoteCache) Delete(key []byte, version cache.Version, time cache.Timestamp) error {
 	req := &remoteRequest{
 		cmd:      protocol.CmdDelete,
@@ -152,11 +149,9 @@ func (c remoteCache) Delete(key []byte, version cache.Version, time cache.Timest
 	return cache.UnknownError
 }
 
-// Touch ...
 func (c remoteCache) Touch(key []byte, expires cache.Timestamp) error {
 	return cache.UnknownError
 }
 
-// Expire ...
 func (c remoteCache) Expire(time cache.Timestamp) {
 }

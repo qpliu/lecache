@@ -1,4 +1,4 @@
--- | Protocol implements a subset of the memcache binary protocol
+-- | Protocol supports a subset of the memcache protocol.
 module Protocol(
     -- * Types
     Packet,
@@ -24,10 +24,11 @@ import Network.Socket.ByteString(recv,sendMany)
 
 import Logger(Logger)
 
--- | Packet
+-- | Packet represents a packet in the memcache protocol.
 data Packet = Packet ByteString [ByteString] (Maybe ByteString) (Maybe ByteString)
 
--- | readPacket
+-- | readPacket reads a packet in the memcache protocol.  magic is the
+-- magic byte to expect.
 readPacket :: Logger -> Socket -> Magic -> IO (Maybe Packet)
 readPacket logger socket (Magic magic) = do
     maybeHeader <- readChunk logger socket 24
@@ -70,7 +71,7 @@ readChunk logger socket size = readChunk' size []
                   then return $ Just bytes
                   else return $ Just $ B.concat $ reverse (bytes:list)
 
--- | writeRequest
+-- | writeRequest writes a request packet in the memcache protocol.
 writeRequest :: Logger -> Socket -> Cmd -> Word32 -> Word64 -> [ByteString] -> Maybe ByteString -> Maybe ByteString -> IO ()
 writeRequest logger socket (Cmd cmd) opaque version extras key value = do
     let bytes = (pack [magic, cmd,
@@ -94,7 +95,8 @@ writeRequest logger socket (Cmd cmd) opaque version extras key value = do
     extrasLength = sum $ map B.length extras
     totalLength = keyLength + extrasLength + maybe 0 B.length value
 
--- | writeResponse
+-- | writeResponse writes a response packet in the memcache protocol.
+-- Packet is the request packet.
 writeResponse :: Logger -> Socket -> Packet -> Status -> Word64 -> [ByteString] -> Maybe ByteString -> Maybe ByteString -> IO ()
 writeResponse logger socket (Packet header _ _ _) (Status status) version extras key value = do
     let bytes = (pack [magic, header `index` 1,
@@ -118,50 +120,50 @@ writeResponse logger socket (Packet header _ _ _) (Status status) version extras
     extrasLength = sum $ map B.length extras
     totalLength = keyLength + extrasLength + maybe 0 B.length value
 
--- | packetCmd
+-- | packetCmd returns the command opcode.
 packetCmd :: Packet -> Cmd
 packetCmd (Packet header _ _ _) = Cmd $ header `index` 1
 
--- | packetStatus
+-- | packetStatus returns the response status.
 packetStatus :: Packet -> Status
 packetStatus (Packet header _ _ _) = Status $ header `readWord16` 6
 
--- | packetOpaque
+-- | packetOpaque returns the opaque value.
 packetOpaque :: Packet -> Word32
 packetOpaque (Packet header _ _ _) = header `readWord32` 12
 
--- | packetVersion
+-- | packetVersion returns the data version check or CAS.
 packetVersion :: Packet -> Word64
 packetVersion (Packet header _ _ _) = header `readWord64` 16
 
--- | packetExtras
+-- | packetExtras returns the extras bytes.
 packetExtras :: Packet -> [ByteString]
 packetExtras (Packet _ extras _ _) = extras
 
--- | packetKey
+-- | packetKey returns the key.
 packetKey :: Packet -> Maybe ByteString
 packetKey (Packet _ _ key _) = key
 
--- | packetValue
+-- | packetValue returns the value.
 packetValue :: Packet -> Maybe ByteString
 packetValue (Packet _ _ _ value) = value
 
--- | makeExpiry
+-- | makeExpiry makes the extras bytes containing the time to expiration.
 makeExpiry :: NominalDiffTime -> ByteString
 makeExpiry diffTime =
     pack [dt `shift` 3, dt `shift` 2, dt `shift` 1, dt `shift` 0]
   where
     dt = floor diffTime
 
--- | makeFlags
+-- | makeFlags makes the extras bytes containing the flags.
 makeFlags :: Word32 -> ByteString
 makeFlags f = pack [f `shift` 3, f `shift` 2, f `shift` 1, f `shift` 0]
 
--- | getExpiry
+-- | getExpiry gets the expiration time from the extras bytes.
 getExpiry :: ByteString -> Int -> NominalDiffTime
 getExpiry extras index = fromInteger $ fromIntegral $ extras `readWord32` index
 
--- | getFlags
+-- | getFlags gets the flags from the extras bytes.
 getFlags :: ByteString -> Int -> Word32
 getFlags extras index = extras `readWord32` index
 

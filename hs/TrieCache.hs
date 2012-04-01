@@ -1,9 +1,5 @@
 -- | TrieCache implements an in-memory cache, using a trie,
 -- written as an exercise in learning STM.
---
--- One flaw is that version numbers are reset when expired subtries are
--- pruned.  One fix would be to add a start version to CacheEntry that
--- gets updated every time its subtries are pruned.
 module TrieCache(
     -- * Types
     TrieCache,
@@ -23,8 +19,10 @@ import Cache(
     CacheError(EntryExists,NotFound,VersionMismatch,UnknownError),
     Expires(Expires),Timestamp(Timestamp),Version(Version))
 
--- | TrieCache.  Ord t => t is the timestamp type.  e is the type of
--- the data entries.
+-- | TrieCache.  t is the timestamp type.  e is the type of the cached values.
+-- One flaw is that version numbers are reset when expired subtries are
+-- pruned.  One fix would be to add a start version to CacheEntry that
+-- gets updated every time its subtries are pruned.
 newtype TrieCache t e = TrieCache (TVar (CacheEntry t e))
 
 type Entry t e = Maybe (t,e)
@@ -35,7 +33,7 @@ data CacheEntry t e = CacheEntry {
     ceTrie :: TArray Word8 (Maybe (CacheEntry t e))
     }
 
--- | newTrieCache
+-- | Create a new empty TrieCache.
 newTrieCache :: Ord t => IO (TrieCache t e)
 newTrieCache = atomically $ do
     ce <- newCacheEntry

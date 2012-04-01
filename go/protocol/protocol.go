@@ -1,4 +1,4 @@
-// protocol ...
+// Package protocol supports a subset of the memcache protocol.
 package protocol
 
 import (
@@ -9,11 +9,11 @@ import (
 )
 
 const (
-	// ....
+	// Magic byte values.
 	MagicRequest  = 0x80
 	MagicResponse = 0x81
 
-	// ....
+	// Response status values.
 	StatusNoError       = 0
 	StatusKeyNotFound   = 1
 	StatusKeyExists     = 2
@@ -21,7 +21,7 @@ const (
 	StatusNotSupported  = 131
 	StatusInternalError = 132
 
-	// ....
+	// Command opcode byte values.
 	CmdGet     = 0
 	CmdSet     = 1
 	CmdAdd     = 2
@@ -32,13 +32,15 @@ const (
 
 var BadMagic = errors.New("Bad magic")
 
-// Packet ...
+// Packet represents a packet in the memcache protocol.
 type Packet struct {
 	header             []byte
 	Extras, Key, Value []byte
 }
 
-// ReadPacket ...
+// ReadPacket reads a packet in the memcache protocol.  magic is the
+// magic byte to expect.  If header is large enough to contain the
+// packet header (24 bytes), it will be used to hold the header.
 func ReadPacket(logger *log.Logger, reader io.Reader, magic byte, header []byte) (*Packet, error) {
 	if header == nil || len(header) < 24 {
 		header = make([]byte, 24)
@@ -81,7 +83,7 @@ func ReadPacket(logger *log.Logger, reader io.Reader, magic byte, header []byte)
 	return packet, nil
 }
 
-// WriteRequest ...
+// WriteRequest writes a request packet in the memcache protocol.
 func WriteRequest(logger *log.Logger, writer io.Writer, cmd byte, opaque uint32, version uint64, header, extras, key, value []byte) error {
 	if header == nil || len(header) < 24 {
 		header = make([]byte, 24)
@@ -118,7 +120,8 @@ func WriteRequest(logger *log.Logger, writer io.Writer, cmd byte, opaque uint32,
 	return err
 }
 
-// WriteResponse ...
+// WriteResponse writes a response packet in the memcache protocol.
+// packet is the request packet.
 func WriteResponse(logger *log.Logger, writer io.Writer, packet *Packet, status uint16, version uint64, extras, key, value []byte) error {
 	packet.header[0] = MagicResponse
 	setUint16(packet.header, 2, uint16(len(key)))
@@ -217,32 +220,33 @@ func setUint64(bytes []byte, index int, value uint64) {
 	bytes[index+7] = byte(value)
 }
 
-// Cmd ...
+// Cmd returns the command opcode byte.
 func (packet *Packet) Cmd() byte {
 	return packet.header[1]
 }
 
-// Status ...
+// Status returns the response status.
 func (packet *Packet) Status() uint16 {
 	return getUint16(packet.header, 6)
 }
 
-// Opaque ...
+// Opaque returns the opaque value.
 func (packet *Packet) Opaque() uint32 {
 	return getUint32(packet.header, 12)
 }
 
-// Version ...
+// Version returns the data version check or CAS.
 func (packet *Packet) Version() uint64 {
 	return getUint64(packet.header, 16)
 }
 
-// Flags ...
+// Flags returns the flags, assuming the packet includes the flags.
 func (packet *Packet) Flags() uint32 {
 	return getUint32(packet.Extras, 0)
 }
 
-// Expiry ...
+// Expiry returns the time to expiration in nanoseconds, assuming the
+// packet includes the expiry.
 func (packet *Packet) Expiry() uint64 {
 	if len(packet.Extras) == 4 {
 		return uint64(getUint32(packet.Extras, 0)) * uint64(time.Second)
@@ -250,21 +254,22 @@ func (packet *Packet) Expiry() uint64 {
 	return uint64(getUint32(packet.Extras, 4)) * uint64(time.Second)
 }
 
-// MakeExpiry ...
+// MakeExpiry makes the extras bytes containing the time to expiration.
 func MakeExpiry(expiry, t uint64) []byte {
 	extras := make([]byte, 4)
 	setUint32(extras, 0, uint32((expiry-t)/uint64(time.Second)))
 	return extras
 }
 
-// MakeFlags ...
+// MakeFlags makes the extras bytes containing the flags.
 func MakeFlags(flags uint32) []byte {
 	extras := make([]byte, 4)
 	setUint32(extras, 0, flags)
 	return extras
 }
 
-// MakeFlagsExpiry ...
+// MakeFlagsExpiry makes the extras bytes containing the flags and the
+// time to expiration.
 func MakeFlagsExpiry(flags uint32, expiry, t uint64) []byte {
 	extras := make([]byte, 8)
 	setUint32(extras, 0, flags)

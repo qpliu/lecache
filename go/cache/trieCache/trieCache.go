@@ -17,15 +17,14 @@ type trieCache struct {
 	trie    [256]*trieCache
 }
 
-// New ...
-// TrieCache is an in-memory cache using a trie.
-// When there is too much lock contention, there will probably be
-// problems with stale timestamps.
+// New returns a new empty Cache.
 func New() cache.Cache {
 	return &trieCache{}
 }
 
-// Get ...
+// Get the value, flags, and version associated with the key.
+// time is the current time.  Returns cache.NotFound is not such
+// entry exists or if it has expired.
 func (tc *trieCache) Get(key []byte, time cache.Timestamp) ([]byte, uint32, cache.Version, error) {
 	for _, k := range key {
 		tc.lock.RLock()
@@ -44,7 +43,9 @@ func (tc *trieCache) Get(key []byte, time cache.Timestamp) ([]byte, uint32, cach
 	return tc.data, tc.flags, tc.version, nil
 }
 
-// Set ...
+// Set the value associated with the key, adding it if not already present,
+// expiring at expires.  timestamp is the current time.  Returns the new
+// version of the entry.
 func (tc *trieCache) Set(key, data []byte, flags uint32, expires, time cache.Timestamp) (cache.Version, error) {
 	for _, k := range key {
 		tc.lock.RLock()
@@ -72,7 +73,9 @@ func (tc *trieCache) Set(key, data []byte, flags uint32, expires, time cache.Tim
 	return tc.version, nil
 }
 
-// Add ...
+// Add the key to the cache with the given value, expiring at expires.
+// timestamp is the current time.  Returns the new version of the entry.
+// Returns cache.EntryExists if the key is already in the cache.
 func (tc *trieCache) Add(key, data []byte, flags uint32, expires, time cache.Timestamp) (cache.Version, error) {
 	for _, k := range key {
 		tc.lock.RLock()
@@ -103,7 +106,12 @@ func (tc *trieCache) Add(key, data []byte, flags uint32, expires, time cache.Tim
 	return tc.version, nil
 }
 
-// Replace ...
+// Replace the value associated with the key with the new value,
+// provided that the version matches the version in the cache,
+// expiring at expires.  timestamp is the current time.  Returns the new
+// version of the entry.  Returns cache.NotFound if the entry does not
+// exist.  Returns cache.VersionMismatch if the version if the cache
+// does not match.
 func (tc *trieCache) Replace(key []byte, data []byte, flags uint32, version cache.Version, expires, time cache.Timestamp) (cache.Version, error) {
 	for _, k := range key {
 		tc.lock.RLock()
@@ -134,7 +142,10 @@ func (tc *trieCache) Replace(key []byte, data []byte, flags uint32, version cach
 	return tc.version, nil
 }
 
-// Delete ...
+// Delete the key form the cache,
+// provided that the version matches the version in the cache.  timestamp
+// is the current time.  Returns NotFound if the entry does not exist.
+// Returns cache.VersionMismatch if the version if the cache does not match.
 func (tc *trieCache) Delete(key []byte, version cache.Version, time cache.Timestamp) error {
 	for _, k := range key {
 		tc.lock.RLock()
@@ -163,7 +174,8 @@ func (tc *trieCache) Delete(key []byte, version cache.Version, time cache.Timest
 	return nil
 }
 
-// Touch ...
+// Change the expiration time for the key.
+// Returns cache.NotFound is the entry does not exist.
 func (tc *trieCache) Touch(key []byte, expires cache.Timestamp) error {
 	for _, k := range key {
 		tc.lock.RLock()
@@ -183,14 +195,14 @@ func (tc *trieCache) Touch(key []byte, expires cache.Timestamp) error {
 	return nil
 }
 
-// Expire ...
-//
-// BUG(qpliu): One flaw is that version numbers are reset when expired
-// subtries are pruned.  One fix would be to add a start version to
-// trieCache that gets updated every time its subtries are pruned.
+// Prune expired entries.  timestamp is the current time.
 func (tc *trieCache) Expire(time cache.Timestamp) {
 	expire(tc, time)
 }
+
+// BUG(qpliu): One flaw is that version numbers are reset when expired
+// subtries are pruned.  One fix would be to add a start version to
+// trieCache that gets updated every time its subtries are pruned.
 
 func expire(tc *trieCache, time cache.Timestamp) bool {
 	empty := true

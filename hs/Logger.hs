@@ -1,4 +1,3 @@
--- | Logger
 module Logger(
     -- * Types
     Logger,
@@ -12,11 +11,14 @@ import Data.Time(getCurrentTime)
 import Debug.Trace(putTraceMsg)
 import Text.Printf(printf)
 
+-- | Logger logs bytes.
 type Logger = String -> ByteString -> IO ()
 
+-- | nullLogger does nothing.
 nullLogger :: Logger
 nullLogger _ _ = return ()
 
+-- | debugLogger logs the bytes with the current time to the debug trace.
 debugLogger :: String -> Logger
 debugLogger prefix marker bytes = do
     t <- getCurrentTime
