@@ -8,13 +8,14 @@ import (
 )
 
 type trieCache struct {
-	lock    sync.RWMutex
-	set     bool
-	expires cache.Timestamp
-	version cache.Version
-	data    []byte
-	flags   uint32
-	trie    [256]*trieCache
+	lock         sync.RWMutex
+	set          bool
+	expires      cache.Timestamp
+	version      cache.Version
+	startVersion cache.Version
+	data         []byte
+	flags        uint32
+	trie         [256]*trieCache
 }
 
 // New returns a new empty Cache.
@@ -57,7 +58,7 @@ func (tc *trieCache) Set(key, data []byte, flags uint32, expires, time cache.Tim
 			tc.lock.Lock()
 			defer tc.lock.Unlock()
 			if tc.trie[k] == nil {
-				tc.trie[k] = &trieCache{}
+				tc.trie[k] = &trieCache{version: tc.startVersion, startVersion: tc.startVersion}
 			}
 			tcnext = tc.trie[k]
 		}
@@ -87,7 +88,7 @@ func (tc *trieCache) Add(key, data []byte, flags uint32, expires, time cache.Tim
 			tc.lock.Lock()
 			defer tc.lock.Unlock()
 			if tc.trie[k] == nil {
-				tc.trie[k] = &trieCache{}
+				tc.trie[k] = &trieCache{version: tc.startVersion, startVersion: tc.startVersion}
 			}
 			tcnext = tc.trie[k]
 		}
@@ -200,10 +201,6 @@ func (tc *trieCache) Expire(time cache.Timestamp) {
 	expire(tc, time)
 }
 
-// BUG(qpliu): One flaw is that version numbers are reset when expired
-// subtries are pruned.  One fix would be to add a start version to
-// trieCache that gets updated every time its subtries are pruned.
-
 func expire(tc *trieCache, time cache.Timestamp) bool {
 	empty := true
 	for i := 0; i < 256; i++ {
@@ -241,9 +238,23 @@ func expire(tc *trieCache, time cache.Timestamp) bool {
 		if c == nil {
 		} else if expire(c, time) {
 			tc.trie[i] = nil
+			tc.startVersion = max(tc.startVersion, c.startVersion, c.version)
 		} else {
 			empty = false
 		}
 	}
 	return empty
+}
+
+func max(v1 cache.Version, v2 cache.Version, v3 cache.Version) cache.Version {
+	if v1 > v2 {
+		if v1 > v3 {
+			return v1
+		}
+		return v3
+	}
+	if v2 > v3 {
+		return v2
+	}
+	return v3
 }
