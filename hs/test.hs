@@ -16,19 +16,24 @@ import TrieCache(newTrieCache)
 
 main :: IO ()
 main = withSocketsDo $ do
-    args <- getArgs
-    case args of
-      ["-d",hostname,servicename] -> do
-            cache1 <- newRemoteCache (debugLogger "test1") hostname servicename ((,) 0 . toBytes) (show . snd) diffUTCTime
-            cache2 <- newRemoteCache (debugLogger "test2") hostname servicename ((,) 0 . toBytes) (show . snd) diffUTCTime
-            test [cache1,cache2] 4
-      [hostname,servicename] -> do
-            cache1 <- newRemoteCache nullLogger hostname servicename ((,) 0 . toBytes) (show . snd) diffUTCTime
-            cache2 <- newRemoteCache nullLogger hostname servicename ((,) 0 . toBytes) (show . snd) diffUTCTime
-            test [cache1,cache2] 4
+    (nthreads,nconnections,remote,logger) <- fmap (parseArgs (4,2,Nothing,const nullLogger)) getArgs
+    case remote of
+      Just (hostname,servicename) -> do
+        caches <- sequence $ [newRemoteCache (logger ("test" ++ show i)) hostname servicename ((,) 0 . toBytes) (show . snd) diffUTCTime | i <- [1..nconnections]]
+        test caches nthreads
       _ -> do
-            cache <- newTrieCache
-            test [cache] 4
+        cache <- newTrieCache
+        test [cache] nthreads
+  where
+    parseArgs (nthreads,nconnections,remote,logger) ("-c":arg:args) =
+        parseArgs (nthreads,read arg,remote,logger) args
+    parseArgs (nthreads,nconnections,remote,logger) ("-d":args) =
+        parseArgs (nthreads,nconnections,remote,debugLogger) args
+    parseArgs (nthreads,nconnections,remote,logger) ("-t":arg:args) =
+        parseArgs (read arg,nconnections,remote,logger) args
+    parseArgs (nthreads,nconnections,remote,logger) (host:port:_) =
+        (nthreads,nconnections,Just (host,port),logger)
+    parseArgs result _ = result
 
 test :: Cache cache => [cache UTCTime String] -> Int -> IO ()
 test caches nthreads = do
@@ -40,8 +45,8 @@ test1 :: Cache cache => Chan () -> (cache UTCTime String,Int) -> IO ()
 test1 done (cache,i) = do
     let key1 = toBytes $ "key" ++ show ((i+1) `mod` 2 + 1)
     let key2 = toBytes $ "key" ++ show ((i+2) `mod` 2 + 1)
-    let value1 = "value" ++ show ((i-1)*2)
-    let value2 = "value" ++ show ((i-1)*2 + 1)
+    let value1 = "value" ++ show ((i-1)*2 + 1)
+    let value2 = "value" ++ show ((i-1)*2 + 2)
     let tag = show i
     t <- getCurrentTime
     let exp = fromInteger 5 `addUTCTime` t

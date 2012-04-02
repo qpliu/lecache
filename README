@@ -42,8 +42,10 @@ listen on, and defaults to 22122.
 
 Running the test client:
 
-  * ./test [[-d] hostname port-number]
+  * ./test [-t nthreads] [-c nconnections] [-d] [hostname port-number]
 
 The -d flag turns on debug tracing.  The hostname and port-number
 is the location of the remote cache.  If omitted, the in-memory trie
-cache is used.
+cache is used.  nthreads is the number of threads, defaulting to 4.
+nconnections is the number of connections to the remote cache,
+defaulting to 2.  Each thread will only use one connection.

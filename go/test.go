@@ -7,35 +7,25 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strconv"
 	"time"
 )
 
-// test ...
 func main() {
+	nthreads, nconnections, remote, logger := parseArgs(os.Args)
 	var caches []cache.Cache
-	var remote string
-	var logger *log.Logger
-	nthreads := 4
-	if len(os.Args) == 4 && os.Args[1] == "-d" {
-		remote = os.Args[2] + ":" + os.Args[3]
-		logger = log.New(os.Stdout, "test ", log.LstdFlags)
-	} else if len(os.Args) == 3 {
-		remote = os.Args[1] + ":" + os.Args[2]
-	}
 	if remote == "" {
 		caches = []cache.Cache{trieCache.New()}
 	} else {
-		cache1, err := remoteCache.New(logger, remote)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, err.Error())
-			os.Exit(1)
+		caches = make([]cache.Cache, nconnections)
+		for i, _ := range caches {
+			c, err := remoteCache.New(logger, remote)
+			if err != nil {
+				fmt.Fprintln(os.Stderr, err.Error())
+				os.Exit(1)
+			}
+			caches[i] = c
 		}
-		cache2, err := remoteCache.New(logger, remote)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, err.Error())
-			os.Exit(1)
-		}
-		caches = []cache.Cache{cache1, cache2}
 	}
 	done := make(chan bool)
 	for i := 0; i < nthreads; i++ {
@@ -44,6 +34,43 @@ func main() {
 	for i := 0; i < nthreads; i++ {
 		<-done
 	}
+}
+
+func parseArgs(args []string) (int, int, string, *log.Logger) {
+	var logger *log.Logger
+	var nthreads, nconnections int = 4, 2
+	for i := 1; i < len(args); i++ {
+		switch args[i] {
+		case "-d":
+			logger = log.New(os.Stdout, "test ", log.LstdFlags)
+		case "-t":
+			i++
+			if i < len(args) {
+				var err error
+				nthreads, err = strconv.Atoi(args[i])
+				if err != nil {
+					fmt.Fprintln(os.Stderr, err.Error())
+					os.Exit(1)
+				}
+			}
+		case "-c":
+			i++
+			if i < len(args) {
+				var err error
+				nconnections, err = strconv.Atoi(args[i])
+				if err != nil {
+					fmt.Fprintln(os.Stderr, err.Error())
+					os.Exit(1)
+				}
+			}
+		default:
+			i++
+			if i < len(args) {
+				return nthreads, nconnections, args[i-1] + ":" + args[i], logger
+			}
+		}
+	}
+	return nthreads, nconnections, "", logger
 }
 
 func test1(done chan bool, c cache.Cache, i int) {
