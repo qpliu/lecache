@@ -36,10 +36,10 @@ type Cache interface {
 
 // Now returns a Timestamp with the current time.
 func Now() Timestamp {
-	return Timestamp(time.Now().Unix())
+	return Timestamp(time.Now().UnixNano())
 }
 
 // Future returns a Timestamp with a future time.
 func Future(duration time.Duration) Timestamp {
-	return Timestamp(time.Now().Add(duration).Unix())
+	return Timestamp(time.Now().Add(duration).UnixNano())
 }
